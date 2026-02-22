@@ -35,11 +35,11 @@
 
 ## 🛠️ Stack Tecnológico
 <p align="left">
-  <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/kotlin/kotlin-original.svg" alt="kotlin" width="50" height="50"/>
-  &nbsp;&nbsp;
-  <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/android/android-original.svg" alt="android" width="50" height="50"/>
-  &nbsp;&nbsp;
-  <img src="https://raw.githubusercontent.com/at-shoji/jetpack-compose-logos/main/logos/jetpack_compose_icon_rgb.svg" alt="jetpack-compose" width="50" height="50"/>
+  <img src="https://img.shields.io/badge/kotlin-%237F52FF.svg?style=for-the-badge&logo=kotlin&logoColor=white" alt="Kotlin" />
+  &nbsp;
+  <img src="https://img.shields.io/badge/Android-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android" />
+  &nbsp;
+  <img src="https://img.shields.io/badge/Jetpack%20Compose-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white" alt="Jetpack Compose" />
 </p>
 
 ---
