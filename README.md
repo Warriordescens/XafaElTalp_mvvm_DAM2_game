@@ -1,9 +1,5 @@
 # 🔨 Xafa El Talp | Jetpack Compose Game
 
-<p align="center">
-  <img src="https://capsule-render.vercel.app/render?type=soft&color=F4E3B1&height=200&section=header&text=Xafa%20El%20Talp&fontSize=70&animation=fadeIn&fontColor=5D4037" />
-</p>
-
 ## 🚀 Key Features
 - **State-Driven UI**: La interfaz reacciona instantáneamente a los cambios en el ViewModel usando `StateFlow`.
 - **Custom Animations**: Implementación de `bounceClick` y transiciones suaves entre pantallas.
