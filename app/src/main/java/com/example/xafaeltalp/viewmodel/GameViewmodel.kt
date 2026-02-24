@@ -45,7 +45,6 @@ class GameViewmodel : ViewModel() {
         )
     }
 
-    // Modificamos el loop del talp para que se detenga al acabar
     private suspend fun moleLoop() {
         while (_uiState.value.timeLeft > 0 && !_uiState.value.isGameOver) {
             _uiState.value = _uiState.value.copy(moleIndex = (0..8).random())

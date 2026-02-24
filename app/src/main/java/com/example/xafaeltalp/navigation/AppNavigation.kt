@@ -17,6 +17,7 @@ import com.example.xafaeltalp.view.ScreenWelcome
 import com.example.xafaeltalp.view.game.GameScreen
 import com.example.xafaeltalp.viewmodel.GameViewmodel
 import com.example.xafaeltalp.viewmodel.LoginViewModel
+import com.example.xafaeltalp.view.ScreenInfo
 
 fun setInclusiveTrue(builder: PopUpToBuilder) {
     builder.inclusive = true
@@ -91,7 +92,8 @@ fun AppNavigation(
                 onStartGame = ::anarAJugar,
                 // Asegúrate de pasar estas funciones si tu ScreenWelcome las pide ahora
                 onRankingClick = { /* Próximamente */ },
-                onConfigClick = { /* Próximamente */ }
+                onConfigClick = { /* Próximamente */ },
+                onInfoClick = { navController.navigate("info_screen") }
             )
         }
 
@@ -102,24 +104,17 @@ fun AppNavigation(
                 onBackClick = ::tornarEnrere
             )
         }
+        composable(route = "info_screen") {
+            ScreenInfo(onBackClick = { navController.popBackStack() })
+        }
 
-//        composable(
-//            route = AppScreens.Welcome.route,
-//            arguments = listOf(navArgument("username", ::configurarArgUsername))
-//        ) { backStackEntry ->
-//            val username = backStackEntry.arguments?.getString("username") ?: "Desconegut"
-//
-//            ScreenWelcome(
-//                onLogoutClick = ::ferLogout,
-//                onStartGame = ::anarAJugar,
-//                onRankingClick = {
-//                    println("Navegar a Ranking para $username")
-//                    // Aquí podrías hacer: navController.navigate(AppScreens.Ranking.route)
-//                },
-//                onConfigClick = {
-//                    println("Abrir Configuración")
-//                }
-//            )
-//        }
+// Y en el composable de Welcome, asegúrate de pasar la navegación:
+        composable(route = AppScreens.Welcome.route) {
+            ScreenWelcome(
+                onLogoutClick = ::ferLogout,
+                onStartGame = ::anarAJugar,
+                onInfoClick = { navController.navigate("info_screen") } // Nueva función
+            )
+        }
     }
 }
