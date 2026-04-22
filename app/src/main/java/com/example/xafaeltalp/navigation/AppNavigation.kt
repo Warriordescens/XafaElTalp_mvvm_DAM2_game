@@ -29,10 +29,10 @@ fun configurarPopUpLogin(builder: NavOptionsBuilder) {
 
 @Composable
 fun AppNavigation(
-    onCloseApp: () -> Unit
+    onCloseApp: () -> Unit,
+    gameViewModel: GameViewmodel = viewModel()
 ){
     val navController = rememberNavController()
-    val gameViewModel: GameViewmodel = viewModel()
 
     fun ferLogout() = navController.navigate(AppScreens.Login.route, ::configurarPopUpLogin)
     fun anarASeleccioMode() = navController.navigate(AppScreens.ModeSelection.route)

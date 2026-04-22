@@ -28,32 +28,28 @@ fun ScreenWelcome(
 
     Box(modifier = Modifier.fillMaxSize().background(fondoColor)) {
 
+        // --- INFORMACIÓN ARRIBA A LA DERECHA ---
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 40.dp, end = 20.dp)
+                .size(60.dp)
+                .bounceClick { onInfoClick() },
+            contentAlignment = Alignment.Center
+        ) {
+            Text("ℹ️", fontSize = 35.sp)
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 100.dp, top = 60.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(horizontal = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            // --- CONFIG Y RANKING ---
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 50.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.config_button),
-                    contentDescription = "Configuración",
-                    modifier = Modifier.size(200.dp).bounceClick { onConfigClick() }
-                )
-                Image(
-                    painter = painterResource(id = R.drawable.ranking_button),
-                    contentDescription = "Ranking",
-                    modifier = Modifier.size(205.dp).bounceClick { onRankingClick() }
-                )
-            }
-
             Spacer(modifier = Modifier.weight(1f))
 
-            // --- PLAY ---
+            // --- PLAY EN EL CENTRO ---
             Image(
                 painter = painterResource(id = R.drawable.play_button),
                 contentDescription = "Jugar",
@@ -66,23 +62,11 @@ fun ScreenWelcome(
             Button(
                 onClick = { onLogoutClick() },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8D6E63)),
-                modifier = Modifier.fillMaxWidth(0.6f).height(105.dp).padding(top = 50.dp)
+                modifier = Modifier.fillMaxWidth(0.6f).height(65.dp)
             ) {
-                Text("SALIR", color = Color.White)
+                Text("SALIR", color = Color.White, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
             }
-            Spacer(modifier = Modifier.height(20.dp))
-        }
-
-        // --- INFORMACIÓN ---
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(20.dp)
-                .size(60.dp)
-                .bounceClick { onInfoClick() },
-            contentAlignment = Alignment.Center
-        ) {
-            Text("ℹ️", fontSize = 35.sp) // Un emoji grande y claro
+            Spacer(modifier = Modifier.height(40.dp))
         }
     }
 }

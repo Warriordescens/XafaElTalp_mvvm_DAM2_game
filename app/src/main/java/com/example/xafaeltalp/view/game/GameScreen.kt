@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.xafaeltalp.R
 import com.example.xafaeltalp.viewmodel.GameViewmodel
+import com.example.xafaeltalp.viewmodel.MoleType
 
 @Composable
 fun GameScreen(
@@ -33,7 +34,6 @@ fun GameScreen(
     val tierraOscura = Color(0xFF5D4037)
 
     LaunchedEffect(key1 = mode, key2 = difficulty) {
-        vm.resetGame()
         vm.startGame(mode, difficulty)
     }
 
@@ -51,7 +51,6 @@ fun GameScreen(
                 .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Cabecera con info del modo
             Text(
                 text = if (state.gameMode == "endless") "NIVEL ${state.level}" else "BOSS FIGHT (${state.difficulty.uppercase()})",
                 color = Color.White,
@@ -70,18 +69,20 @@ fun GameScreen(
                 ScoreBadge(label = "TIEMPO", value = "${state.timeLeft}s", color = if (state.timeLeft < 10) Color.Red else tierraOscura)
             }
 
-            // Mensaje del Boss
             Box(modifier = Modifier.height(60.dp), contentAlignment = Alignment.Center) {
-                this@Column.AnimatedVisibility(
-                    visible = state.bossActionMessage != null,
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically()
-                ) {
+                if (state.bossActionMessage != null) {
                     Text(
                         text = state.bossActionMessage ?: "",
                         color = Color.Yellow,
                         fontSize = 30.sp,
                         fontWeight = FontWeight.Black
+                    )
+                } else if (state.isSlowed) {
+                    Text(
+                        text = "❄️ ¡RALENTIZADO! ❄️",
+                        color = Color.Cyan,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
@@ -101,6 +102,8 @@ fun GameScreen(
                 ) {
                     items(9) { index ->
                         val isBlocked = state.blockedCells.contains(index)
+                        val moleType = state.activeMoles[index]
+                        
                         Box(
                             modifier = Modifier
                                 .padding(4.dp)
@@ -112,13 +115,9 @@ fun GameScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             if (isBlocked) {
-                                Text("🪨", fontSize = 30.sp) // Tierra/Bloqueo
-                            } else if (state.moleIndex == index) {
-                                Image(
-                                    painter = painterResource(id = R.drawable.talp_button),
-                                    contentDescription = "Talp",
-                                    modifier = Modifier.fillMaxSize(0.9f)
-                                )
+                                Text("🪨", fontSize = 35.sp)
+                            } else if (moleType != null) {
+                                MoleIcon(type = moleType)
                             }
                         }
                     }
@@ -126,6 +125,11 @@ fun GameScreen(
             }
 
             Spacer(modifier = Modifier.weight(1.2f))
+        }
+
+        // --- OVERLAYS ---
+        if (state.isPaused) {
+            PauseOverlay(onResume = { vm.resumeGame() }, onMenu = onBackClick)
         }
 
         if (state.isGameOver) {
@@ -138,13 +142,81 @@ fun GameScreen(
         if (state.isLevelCleared) {
             VictoryOverlay(onNext = {
                 if (mode == "endless") {
-                    // La lógica de nextLevel ya está en el VM y se dispara por tiempo
-                    // Pero si queremos un botón de "Siguiente" podemos añadirlo
+                    // El VM ya gestiona la transición
                 } else {
-                    onBackClick() // Volver al menú tras ganar al boss
+                    onBackClick()
                 }
             }, isEndless = mode == "endless")
         }
+    }
+}
+
+@Composable
+fun PauseOverlay(onResume: () -> Unit, onMenu: () -> Unit) {
+    val fondoPergamino = Color(0xFFF4E3B1)
+    val tierraOscura = Color(0xFF5D4037)
+
+    Box(
+        modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            color = fondoPergamino,
+            shape = RoundedCornerShape(24.dp),
+            modifier = Modifier.fillMaxWidth(0.8f).padding(20.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    "JUEGO EN PAUSA", 
+                    fontSize = 28.sp, 
+                    fontWeight = FontWeight.Black, 
+                    color = tierraOscura
+                )
+                
+                Spacer(modifier = Modifier.height(32.dp))
+
+                Button(
+                    onClick = onResume,
+                    modifier = Modifier.fillMaxWidth().height(60.dp).bounceClick { onResume() },
+                    colors = ButtonDefaults.buttonColors(containerColor = tierraOscura),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("CONTINUAR", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedButton(
+                    onClick = onMenu,
+                    modifier = Modifier.fillMaxWidth().height(55.dp),
+                    border = androidx.compose.foundation.BorderStroke(2.dp, tierraOscura),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("SALIR AL MENÚ", color = tierraOscura, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun MoleIcon(type: MoleType) {
+    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+        val resId = when(type) {
+            MoleType.NORMAL -> R.drawable.talp_button
+            MoleType.GOLDEN -> R.drawable.goldentalp
+            MoleType.LESS_TIME -> R.drawable.lesstimetalp
+            MoleType.SLOWED -> R.drawable.slowedtalp
+            MoleType.BOMB -> R.drawable.bomb
+        }
+        Image(
+            painter = painterResource(id = resId),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(0.9f)
+        )
     }
 }
 
@@ -177,7 +249,7 @@ fun ScoreBadge(label: String, value: String, color: Color) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
-            Text(value, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = color)
+            Text(value, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = color)
         }
     }
 }
