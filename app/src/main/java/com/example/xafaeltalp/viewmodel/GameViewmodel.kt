@@ -12,18 +12,20 @@ enum class MoleType {
 
 data class GameUiState(
     val score: Int = 0,
-    val timeLeft: Int = 30,
+    val timeLeft: Int = 15, 
     val activeMoles: Map<Int, MoleType> = emptyMap(),
     val isGameOver: Boolean = false,
     val isPaused: Boolean = false,
     val level: Int = 1,
+    val bossHealth: Float = 1f, 
     val targetScore: Int = 50,
     val gameMode: String = "endless",
     val difficulty: String = "normal",
     val blockedCells: Set<Int> = emptySet(),
     val isLevelCleared: Boolean = false,
     val bossActionMessage: String? = null,
-    val isSlowed: Boolean = false
+    val isSlowed: Boolean = false,
+    val lives: Int = 3
 )
 
 class GameViewmodel : ViewModel() {
@@ -33,27 +35,28 @@ class GameViewmodel : ViewModel() {
     private var gameJob: Job? = null
     private var bossJob: Job? = null
     private var moleSpawnJob: Job? = null
+    
+    private var maxBossHealth = 200f
 
     fun startGame(mode: String, difficulty: String) {
         val isFirstStart = _uiState.value.level == 1 && _uiState.value.score == 0
         
         if (isFirstStart || mode == "boss") {
-            val (target, time) = when(mode) {
-                "boss" -> when(difficulty) {
-                    "easy" -> 150 to 30
-                    "normal" -> 200 to 35
-                    "hard" -> 250 to 45
-                    else -> 150 to 30
-                }
-                else -> 50 to 30
+            maxBossHealth = when(difficulty) {
+                "easy" -> 150f
+                "normal" -> 250f
+                "hard" -> 400f
+                else -> 200f
             }
             
             _uiState.value = GameUiState(
                 gameMode = mode,
                 difficulty = difficulty,
-                targetScore = target,
-                timeLeft = time,
-                level = if (mode == "endless") 1 else _uiState.value.level
+                targetScore = if(mode == "endless") 50 else maxBossHealth.toInt(),
+                timeLeft = if (mode == "boss") 12 else 30,
+                lives = if (mode == "boss") 3 else 1,
+                bossHealth = 1f,
+                level = if (mode == "endless" && isFirstStart) 1 else _uiState.value.level
             )
         } else {
             _uiState.value = _uiState.value.copy(
@@ -76,14 +79,8 @@ class GameViewmodel : ViewModel() {
         bossJob?.cancel()
         moleSpawnJob?.cancel()
         
-        gameJob = viewModelScope.launch {
-            startTimer()
-        }
-
-        moleSpawnJob = viewModelScope.launch {
-            moleControllerLoop()
-        }
-
+        gameJob = viewModelScope.launch { startTimer() }
+        moleSpawnJob = viewModelScope.launch { moleControllerLoop() }
         if (_uiState.value.gameMode == "boss") {
             bossJob = viewModelScope.launch { bossLoop() }
         }
@@ -109,131 +106,103 @@ class GameViewmodel : ViewModel() {
         }
         
         if (_uiState.value.timeLeft <= 0 && !_uiState.value.isLevelCleared && !_uiState.value.isPaused) {
-            if (_uiState.value.gameMode == "endless" && _uiState.value.score >= _uiState.value.targetScore) {
-                _uiState.value = _uiState.value.copy(isLevelCleared = true)
-                delay(1500)
-                nextLevel()
+            if (_uiState.value.gameMode == "endless") {
+                _uiState.value = _uiState.value.copy(isGameOver = true)
             } else {
-                _uiState.value = _uiState.value.copy(isGameOver = true, activeMoles = emptyMap())
+                _uiState.value = _uiState.value.copy(bossActionMessage = "¡ATAQUE DEL BOSS!")
+                handleLifeLoss()
             }
+        }
+    }
+
+    private fun handleLifeLoss() {
+        val newLives = _uiState.value.lives - 1
+        if (newLives <= 0) {
+            _uiState.value = _uiState.value.copy(lives = 0, isGameOver = true, activeMoles = emptyMap())
+        } else {
+            _uiState.value = _uiState.value.copy(
+                lives = newLives,
+                timeLeft = 12, 
+                activeMoles = emptyMap()
+            )
+            resumeJobs()
         }
     }
 
     private fun nextLevel() {
         val nextLv = _uiState.value.level + 1
-        val newTarget = 50 + (nextLv - 1) * 30 
+        val newTarget = 50 + (nextLv - 1) * 30
         _uiState.value = _uiState.value.copy(
             level = nextLv,
+            score = 0,
             timeLeft = 30,
-            targetScore = newTarget
+            targetScore = newTarget,
+            isLevelCleared = false,
+            activeMoles = emptyMap(),
+            blockedCells = emptySet()
         )
-        startGame(_uiState.value.gameMode, _uiState.value.difficulty)
+        resumeJobs()
     }
 
     private suspend fun moleControllerLoop() {
         while (!_uiState.value.isGameOver && !_uiState.value.isLevelCleared && !_uiState.value.isPaused) {
-            val maxMoles = if (_uiState.value.gameMode == "boss" && (_uiState.value.difficulty == "normal" || _uiState.value.difficulty == "hard")) 2 else 1
-            
-            if (_uiState.value.activeMoles.size < maxMoles) {
-                spawnMole()
-            }
+            val maxMoles = if (_uiState.value.gameMode == "boss") 2 else 1
+            if (_uiState.value.activeMoles.size < maxMoles) spawnMole()
             delay(300) 
         }
     }
 
     private fun spawnMole(forcedType: MoleType? = null) {
-        val availableIndices = (0..8).filter { 
-            it !in _uiState.value.activeMoles.keys && it !in _uiState.value.blockedCells 
-        }
-        
+        val availableIndices = (0..8).filter { it !in _uiState.value.activeMoles.keys && it !in _uiState.value.blockedCells }
         if (availableIndices.isEmpty()) return
         
         val index = availableIndices.random()
         val type = forcedType ?: decideMoleType()
         
+        val healthFactor = if(_uiState.value.gameMode == "boss") _uiState.value.bossHealth else 1f
         val baseLifetime = when(type) {
             MoleType.GOLDEN -> 600L
             MoleType.BOMB -> 2000L
-            MoleType.LESS_TIME -> 1500L
-            MoleType.SLOWED -> 1200L
-            else -> {
-                if (_uiState.value.gameMode == "endless") {
-                    (1300 - (_uiState.value.level * 100)).coerceAtLeast(500).toLong()
-                } else {
-                    when(_uiState.value.difficulty) {
-                        "easy" -> 1200L
-                        "normal" -> 900L
-                        "hard" -> 700L
-                        else -> 1000L
-                    }
-                }
-            }
+            else -> (1000 * healthFactor).toLong().coerceAtLeast(400L)
         }
-        
-        val lifetime = if (_uiState.value.isSlowed) baseLifetime * 2 else baseLifetime
 
-        _uiState.value = _uiState.value.copy(
-            activeMoles = _uiState.value.activeMoles + (index to type)
-        )
+        _uiState.value = _uiState.value.copy(activeMoles = _uiState.value.activeMoles + (index to type))
 
         viewModelScope.launch {
-            delay(lifetime)
+            delay(if (_uiState.value.isSlowed) baseLifetime * 2 else baseLifetime)
             if (_uiState.value.activeMoles[index] == type && !_uiState.value.isPaused) {
-                _uiState.value = _uiState.value.copy(
-                    activeMoles = _uiState.value.activeMoles - index
-                )
+                _uiState.value = _uiState.value.copy(activeMoles = _uiState.value.activeMoles - index)
             }
         }
     }
 
     private fun decideMoleType(): MoleType {
         val rand = (1..100).random()
-        return when {
-            _uiState.value.gameMode == "boss" && rand <= 8 -> MoleType.GOLDEN
-            rand <= 18 -> MoleType.LESS_TIME
-            rand <= 25 -> MoleType.SLOWED
-            else -> MoleType.NORMAL
+        return if (_uiState.value.gameMode == "boss") {
+            when {
+                rand <= 5 -> MoleType.GOLDEN
+                rand <= 25 -> MoleType.BOMB
+                rand <= 40 -> MoleType.LESS_TIME
+                else -> MoleType.NORMAL
+            }
+        } else {
+            if (rand <= 15) MoleType.LESS_TIME else MoleType.NORMAL
         }
     }
 
     private suspend fun bossLoop() {
         while (!_uiState.value.isGameOver && !_uiState.value.isLevelCleared && !_uiState.value.isPaused) {
-            val freq = when(_uiState.value.difficulty) {
-                "easy" -> 7000L
-                "normal" -> 5000L
-                "hard" -> 3500L
-                else -> 5000L
-            }
-            delay(freq)
-            
-            if (_uiState.value.isPaused) break
-
-            val action = (1..3).random()
-            when (action) {
-                1 -> { // Bloqueo PERMANENTE
-                    val available = (0..8).filter { it !in _uiState.value.blockedCells }
-                    if (available.isNotEmpty()) {
-                        val blocked = available.shuffled().take(1).toSet()
-                        _uiState.value = _uiState.value.copy(
-                            blockedCells = _uiState.value.blockedCells + blocked,
-                            bossActionMessage = "¡TIERRA BLOQUEADA!"
-                        )
-                    }
-                }
-                2 -> { 
-                    _uiState.value = _uiState.value.copy(bossActionMessage = "¡BOMBA!")
-                    spawnMole(MoleType.BOMB)
-                }
-                3 -> {
-                    val timeToSub = if(_uiState.value.difficulty == "hard") 8 else 5
+            delay(4000)
+            if ((1..100).random() < 30) {
+                val available = (0..8).filter { it !in _uiState.value.blockedCells }
+                if (available.isNotEmpty()) {
+                    val blocked = available.shuffled().take(1).toSet()
                     _uiState.value = _uiState.value.copy(
-                        timeLeft = (_uiState.value.timeLeft - timeToSub).coerceAtLeast(0),
-                        bossActionMessage = "-$timeToSub SEGUNDOS"
+                        blockedCells = _uiState.value.blockedCells + blocked,
+                        bossActionMessage = "¡TIERRA BLOQUEADA!"
                     )
                 }
             }
-            delay(2000)
-            _uiState.value = _uiState.value.copy(bossActionMessage = null)
         }
     }
 
@@ -241,36 +210,36 @@ class GameViewmodel : ViewModel() {
         val type = _uiState.value.activeMoles[index] ?: return
         if (_uiState.value.isGameOver || _uiState.value.isLevelCleared || _uiState.value.isPaused) return
 
-        var newScore = _uiState.value.score
-        var newTimeLeft = _uiState.value.timeLeft
-        var newIsSlowed = _uiState.value.isSlowed
+        var currentScore = _uiState.value.score
+        var damageToBoss = 0f
 
         when(type) {
-            MoleType.NORMAL -> newScore += 10
-            MoleType.GOLDEN -> newScore += 100
-            MoleType.LESS_TIME -> newTimeLeft = (newTimeLeft - 20).coerceAtLeast(0)
-            MoleType.BOMB -> {
-                newScore = (newScore - 50).coerceAtLeast(0)
-                _uiState.value = _uiState.value.copy(bossActionMessage = "¡BOOM! -50")
-            }
-            MoleType.SLOWED -> {
-                newIsSlowed = true
-                viewModelScope.launch {
-                    delay(5000)
-                    _uiState.value = _uiState.value.copy(isSlowed = false)
-                }
-            }
+            MoleType.NORMAL -> damageToBoss = 10f
+            MoleType.GOLDEN -> damageToBoss = 50f
+            MoleType.BOMB -> { handleLifeLoss(); return }
+            MoleType.LESS_TIME -> _uiState.value = _uiState.value.copy(timeLeft = (_uiState.value.timeLeft - 3).coerceAtLeast(0))
+            MoleType.SLOWED -> { }
         }
 
-        _uiState.value = _uiState.value.copy(
-            score = newScore,
-            timeLeft = newTimeLeft,
-            isSlowed = newIsSlowed,
-            activeMoles = _uiState.value.activeMoles - index
-        )
-        
-        if (_uiState.value.gameMode == "boss" && _uiState.value.score >= _uiState.value.targetScore) {
-            _uiState.value = _uiState.value.copy(isLevelCleared = true)
+        if (_uiState.value.gameMode == "boss") {
+            val newScore = currentScore + damageToBoss.toInt()
+            val newHealth = (1f - (newScore / maxBossHealth)).coerceAtLeast(0f)
+            _uiState.value = _uiState.value.copy(
+                score = newScore,
+                bossHealth = newHealth,
+                activeMoles = _uiState.value.activeMoles - index,
+                isLevelCleared = newHealth <= 0f
+            )
+        } else {
+            val newScore = currentScore + damageToBoss.toInt()
+            if (newScore >= _uiState.value.targetScore) {
+                nextLevel()
+            } else {
+                _uiState.value = _uiState.value.copy(
+                    score = newScore,
+                    activeMoles = _uiState.value.activeMoles - index
+                )
+            }
         }
     }
 

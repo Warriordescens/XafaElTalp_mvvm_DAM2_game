@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -51,22 +52,53 @@ fun GameScreen(
                 .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = if (state.gameMode == "endless") "NIVEL ${state.level}" else "BOSS FIGHT (${state.difficulty.uppercase()})",
-                color = Color.White,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(top = 10.dp)
-            )
-
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 10.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                ScoreBadge(label = "PUNTOS", value = "${state.score}/${state.targetScore}", color = Color(0xFF4CAF50))
-                ScoreBadge(label = "TIEMPO", value = "${state.timeLeft}s", color = if (state.timeLeft < 10) Color.Red else tierraOscura)
+                Button(
+                    onClick = onBackClick,
+                    colors = ButtonDefaults.buttonColors(containerColor = tierraOscura),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.height(40.dp).bounceClick { onBackClick() }
+                ) {
+                    Text("SALIR", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+
+                Text(
+                    text = if (state.gameMode == "endless") "NIVEL ${state.level}" else "BOSS FIGHT",
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Black
+                )
+                
+                Spacer(modifier = Modifier.width(60.dp))
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            if (state.gameMode == "boss") {
+                BossHealthBar(health = state.bossHealth)
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    ScoreBadge(
+                        label = "ATAQUE JEFE", 
+                        value = "${state.timeLeft}s", 
+                        color = if (state.timeLeft < 4) Color.Red else tierraOscura
+                    )
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    ScoreBadge(label = "PUNTOS", value = "${state.score}/${state.targetScore}", color = Color(0xFF4CAF50))
+                    ScoreBadge(label = "TIEMPO", value = "${state.timeLeft}s", color = if (state.timeLeft < 10) Color.Red else tierraOscura)
+                }
             }
 
             Box(modifier = Modifier.height(60.dp), contentAlignment = Alignment.Center) {
@@ -124,10 +156,29 @@ fun GameScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.weight(1.2f))
+            Spacer(modifier = Modifier.weight(1f))
+            
+            if (state.gameMode == "boss") {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
+                    horizontalArrangement = Arrangement.Start
+                ) {
+                    repeat(3) { i ->
+                        val active = i < state.lives
+                        Text(
+                            text = "❤️",
+                            fontSize = 35.sp,
+                            modifier = Modifier
+                                .padding(horizontal = 4.dp)
+                                .graphicsLayer(alpha = if (active) 1f else 0.3f)
+                        )
+                    }
+                }
+            } else {
+                Spacer(modifier = Modifier.height(60.dp))
+            }
         }
 
-        // --- OVERLAYS ---
         if (state.isPaused) {
             PauseOverlay(onResume = { vm.resumeGame() }, onMenu = onBackClick)
         }
@@ -142,11 +193,34 @@ fun GameScreen(
         if (state.isLevelCleared) {
             VictoryOverlay(onNext = {
                 if (mode == "endless") {
-                    // El VM ya gestiona la transición
                 } else {
                     onBackClick()
                 }
             }, isEndless = mode == "endless")
+        }
+    }
+}
+
+@Composable
+fun BossHealthBar(health: Float) {
+    Column(modifier = Modifier.fillMaxWidth(0.9f)) {
+        Text("VIDA DEL JEFE", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(20.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(Color.Black.copy(alpha = 0.4f))
+                .border(2.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(health)
+                    .fillMaxHeight()
+                    .background(
+                        if (health > 0.4f) Color(0xFFF44336) else Color(0xFFFFEB3B)
+                    )
+            )
         }
     }
 }
@@ -290,3 +364,5 @@ fun GameOverOverlay(score: Int, onRetry: () -> Unit, onMenu: () -> Unit) {
         }
     }
 }
+
+fun Modifier.alpha(alpha: Float): Modifier = this.then(Modifier.graphicsLayer(alpha = alpha))

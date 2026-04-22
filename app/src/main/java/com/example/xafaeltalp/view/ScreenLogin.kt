@@ -26,7 +26,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.sp
 import com.example.xafaeltalp.view.game.bounceClick
 
-// COM PINTO LA PANTALLA?
 @Composable
 fun ScreenLogin(
     state: LoginUiState,
@@ -36,7 +35,6 @@ fun ScreenLogin(
     onLoginClick: () -> Unit,
     onCloseClick: () -> Unit
 ){
-    // Paleta de colores coherente con el juego
     val tierraOscura = Color(0xFF5D4037)
     val tierraClara = Color(0xFF8D6E63)
     val fondoPergamino = Color(0xFFF4E3B1)
@@ -50,7 +48,6 @@ fun ScreenLogin(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // --- MENSAJE DE BIENVENIDA ESTILO BURBUJA ---
         if (state.message.isNotEmpty()) {
             Surface(
                 color = tierraClara.copy(alpha = 0.1f),
@@ -75,7 +72,6 @@ fun ScreenLogin(
             modifier = Modifier.padding(bottom = 32.dp)
         )
 
-        // --- CAMPOS DE TEXTO ESTILIZADOS ---
         OutlinedTextField(
             value = state.username,
             onValueChange = onUsernameChange,
@@ -103,7 +99,6 @@ fun ScreenLogin(
             )
         )
 
-        // --- BOTONES PRINCIPALES ---
         Button(
             onClick = onLoginClick,
             modifier = Modifier.fillMaxWidth().height(56.dp).bounceClick { onLoginClick() },
@@ -137,7 +132,6 @@ fun ScreenLogin(
             }
         }
 
-        // --- ERROR MENSAJE ---
         if (state.errorMsg.isNotEmpty()) {
             Text(
                 text = state.errorMsg,
@@ -149,5 +143,3 @@ fun ScreenLogin(
         }
     }
 }
-
-
