@@ -18,6 +18,7 @@ import com.example.xafaeltalp.view.game.GameScreen
 import com.example.xafaeltalp.viewmodel.GameViewmodel
 import com.example.xafaeltalp.viewmodel.LoginViewModel
 import com.example.xafaeltalp.view.ScreenInfo
+import com.example.xafaeltalp.view.ModeSelectionScreen
 
 fun setInclusiveTrue(builder: PopUpToBuilder) {
     builder.inclusive = true
@@ -26,11 +27,6 @@ fun configurarPopUpLogin(builder: NavOptionsBuilder) {
     builder.popUpTo(AppScreens.Login.route, ::setInclusiveTrue)
 }
 
-fun configurarArgUsername(builder: androidx.navigation.NavArgumentBuilder) {
-    builder.type = NavType.StringType
-}
-
-////////////////////////////////////////////////////////////////
 @Composable
 fun AppNavigation(
     onCloseApp: () -> Unit
@@ -39,7 +35,7 @@ fun AppNavigation(
     val gameViewModel: GameViewmodel = viewModel()
 
     fun ferLogout() = navController.navigate(AppScreens.Login.route, ::configurarPopUpLogin)
-    fun anarAJugar() = navController.navigate(AppScreens.Game.route)
+    fun anarASeleccioMode() = navController.navigate(AppScreens.ModeSelection.route)
     fun tornarEnrere() = navController.popBackStack()
 
     fun processarRutaViewModelLogin(route: String) {
@@ -49,12 +45,9 @@ fun AppNavigation(
     NavHost(
         navController = navController,
         startDestination = AppScreens.Login.route
-    ){      // Aqui es defineixen les rutes
-        // RUTA 1: Login
+    ){
         composable( route= AppScreens.Login.route ){
-            // instancia del viewModel de Login
             val viewModel: LoginViewModel = viewModel()
-
             val state by viewModel.uiState.collectAsState()
 
             LaunchedEffect(key1 = true) {
@@ -71,50 +64,43 @@ fun AppNavigation(
             )
         }
 
-
-
-        // RUTA 2 : WELCOME
-        composable(
-            route = AppScreens.Welcome.route,
-            arguments = listOf(
-                navArgument("username") {
-                    type = NavType.StringType
-                    nullable = true           // Permite que el dato no venga
-                    defaultValue = "Jugador"   // Valor por defecto si no hay login previo
-                }
-            )
-        ) { backStackEntry ->
-            // Extraemos el nombre de forma segura
-            val username = backStackEntry.arguments?.getString("username") ?: "Jugador"
-
-            ScreenWelcome(
-                onLogoutClick = ::ferLogout,
-                onStartGame = ::anarAJugar,
-                // Asegúrate de pasar estas funciones si tu ScreenWelcome las pide ahora
-                onRankingClick = { /* Próximamente */ },
-                onConfigClick = { /* Próximamente */ },
-                onInfoClick = { navController.navigate("info_screen") }
-            )
-        }
-
-        // RUTA 3 : La pantalla del Joc
-        composable(route = AppScreens.Game.route) {
-            GameScreen(
-                vm = gameViewModel, // Pasamos el ViewModel
-                onBackClick = ::tornarEnrere
-            )
-        }
-        composable(route = "info_screen") {
-            ScreenInfo(onBackClick = { navController.popBackStack() })
-        }
-
-// Y en el composable de Welcome, asegúrate de pasar la navegación:
         composable(route = AppScreens.Welcome.route) {
             ScreenWelcome(
                 onLogoutClick = ::ferLogout,
-                onStartGame = ::anarAJugar,
-                onInfoClick = { navController.navigate("info_screen") } // Nueva función
+                onStartGame = ::anarASeleccioMode,
+                onInfoClick = { navController.navigate(AppScreens.Info.route) }
             )
+        }
+
+        composable(route = AppScreens.ModeSelection.route) {
+            ModeSelectionScreen(
+                onModeSelected = { mode, difficulty ->
+                    navController.navigate(AppScreens.Game.createRoute(mode, difficulty))
+                },
+                onBack = ::tornarEnrere
+            )
+        }
+
+        composable(
+            route = AppScreens.Game.route,
+            arguments = listOf(
+                navArgument("mode") { type = NavType.StringType },
+                navArgument("difficulty") { type = NavType.StringType; defaultValue = "normal" }
+            )
+        ) { backStackEntry ->
+            val mode = backStackEntry.arguments?.getString("mode") ?: "endless"
+            val difficulty = backStackEntry.arguments?.getString("difficulty") ?: "normal"
+            
+            GameScreen(
+                vm = gameViewModel,
+                mode = mode,
+                difficulty = difficulty,
+                onBackClick = ::tornarEnrere
+            )
+        }
+
+        composable(route = AppScreens.Info.route) {
+            ScreenInfo(onBackClick = ::tornarEnrere)
         }
     }
 }

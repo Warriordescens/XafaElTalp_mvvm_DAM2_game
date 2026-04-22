@@ -1,5 +1,6 @@
 package com.example.xafaeltalp.view.game
 
+import androidx.compose.animation.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -24,50 +25,73 @@ import com.example.xafaeltalp.viewmodel.GameViewmodel
 @Composable
 fun GameScreen(
     vm: GameViewmodel,
+    mode: String,
+    difficulty: String,
     onBackClick: () -> Unit
 ) {
     val state by vm.uiState.collectAsState()
     val tierraOscura = Color(0xFF5D4037)
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(key1 = mode, key2 = difficulty) {
         vm.resetGame()
-        vm.startGame()
+        vm.startGame(mode, difficulty)
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // --- 1. FONDO DE IMAGEN REAL DEL JUEGO ---
         Image(
             painter = painterResource(id = R.drawable.game_background),
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop // Para que cubra toda la pantalla
+            contentScale = ContentScale.Crop
         )
 
-        // --- 2. UI DEL JUEGO ---
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Marcadores con estilo "Cartel"
+            // Cabecera con info del modo
+            Text(
+                text = if (state.gameMode == "endless") "NIVEL ${state.level}" else "BOSS FIGHT (${state.difficulty.uppercase()})",
+                color = Color.White,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(top = 10.dp)
+            )
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 10.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                ScoreBadge(label = "PUNTOS", value = "${state.score}", color = Color(0xFF4CAF50))
+                ScoreBadge(label = "PUNTOS", value = "${state.score}/${state.targetScore}", color = Color(0xFF4CAF50))
                 ScoreBadge(label = "TIEMPO", value = "${state.timeLeft}s", color = if (state.timeLeft < 10) Color.Red else tierraOscura)
+            }
+
+            // Mensaje del Boss
+            Box(modifier = Modifier.height(60.dp), contentAlignment = Alignment.Center) {
+                this@Column.AnimatedVisibility(
+                    visible = state.bossActionMessage != null,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    Text(
+                        text = state.bossActionMessage ?: "",
+                        color = Color.Yellow,
+                        fontSize = 30.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // --- TABLERO 3x3 ESTILO TIERRA ---
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(20.dp))
-                    .background(Color.Black.copy(alpha = 0.2f)) // Sombra para el tablero
+                    .background(Color.Black.copy(alpha = 0.2f))
                     .padding(8.dp)
             ) {
                 LazyVerticalGrid(
@@ -76,17 +100,20 @@ fun GameScreen(
                     userScrollEnabled = false
                 ) {
                     items(9) { index ->
+                        val isBlocked = state.blockedCells.contains(index)
                         Box(
                             modifier = Modifier
                                 .padding(4.dp)
                                 .aspectRatio(1f)
                                 .clip(RoundedCornerShape(15.dp))
-                                .background(Color.White.copy(alpha = 0.15f)) // Hueco del talp
+                                .background(if (isBlocked) Color(0xFF3E2723) else Color.White.copy(alpha = 0.15f))
                                 .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(15.dp))
                                 .bounceClick { vm.onMoleHit(index) },
                             contentAlignment = Alignment.Center
                         ) {
-                            if (state.moleIndex == index) {
+                            if (isBlocked) {
+                                Text("🪨", fontSize = 30.sp) // Tierra/Bloqueo
+                            } else if (state.moleIndex == index) {
                                 Image(
                                     painter = painterResource(id = R.drawable.talp_button),
                                     contentDescription = "Talp",
@@ -101,12 +128,38 @@ fun GameScreen(
             Spacer(modifier = Modifier.weight(1.2f))
         }
 
-        // --- 3. CAPA DE GAME OVER ---
         if (state.isGameOver) {
             GameOverOverlay(score = state.score, onRetry = {
                 vm.resetGame()
-                vm.startGame()
+                vm.startGame(mode, difficulty)
             }, onMenu = onBackClick)
+        }
+
+        if (state.isLevelCleared) {
+            VictoryOverlay(onNext = {
+                if (mode == "endless") {
+                    // La lógica de nextLevel ya está en el VM y se dispara por tiempo
+                    // Pero si queremos un botón de "Siguiente" podemos añadirlo
+                } else {
+                    onBackClick() // Volver al menú tras ganar al boss
+                }
+            }, isEndless = mode == "endless")
+        }
+    }
+}
+
+@Composable
+fun VictoryOverlay(onNext: () -> Unit, isEndless: Boolean) {
+    Box(
+        modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.8f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("¡VICTORIA!", color = Color.Green, fontSize = 40.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(20.dp))
+            Button(onClick = onNext) {
+                Text(if (isEndless) "SIGUIENTE NIVEL" else "VOLVER AL MENÚ")
+            }
         }
     }
 }
@@ -124,7 +177,7 @@ fun ScoreBadge(label: String, value: String, color: Color) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
-            Text(value, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = color)
+            Text(value, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = color)
         }
     }
 }
@@ -138,8 +191,8 @@ fun GameOverOverlay(score: Int, onRetry: () -> Unit, onMenu: () -> Unit) {
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("¡FI DEL TIEMPS!", color = Color.White, fontSize = 36.sp, fontWeight = FontWeight.Black)
-            Text("Has aconseguit $score punts", color = Color.Yellow, fontSize = 24.sp)
+            Text("¡GAME OVER!", color = Color.White, fontSize = 36.sp, fontWeight = FontWeight.Black)
+            Text("Puntuación: $score", color = Color.Yellow, fontSize = 24.sp)
 
             Spacer(modifier = Modifier.height(40.dp))
 

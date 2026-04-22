@@ -1,24 +1,18 @@
 package com.example.xafaeltalp.model
 
-object UserRepository {
-    private val users = mutableMapOf<String, User>()
+class UserRepository(private val userDao: UserDao) {
 
-    init {
-        addUser(User("a", "a"))
-        addUser(User("b", "c"))
-        addUser(User("b", "c"))
-    }
-
-    fun addUser(user: User): Boolean {
-        if (users.containsKey(user.username)) {
-            return false
+    suspend fun addUser(user: User): Boolean {
+        val existing = userDao.getUser(user.username)
+        return if (existing == null) {
+            userDao.insert(user)
+            true
         } else {
-            users[user.username] = user
-            return true
+            false
         }
     }
 
-    fun getUser(username: String): User? {
-        return users[username]
+    suspend fun getUser(username: String): User? {
+        return userDao.getUser(username)
     }
 }
