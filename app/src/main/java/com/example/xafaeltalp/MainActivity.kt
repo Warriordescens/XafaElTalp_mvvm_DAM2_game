@@ -5,24 +5,36 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.media.AudioAttributes
+import android.media.MediaPlayer
+import android.media.SoundPool
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.xafaeltalp.navigation.AppNavigation
 import com.example.xafaeltalp.ui.theme.XafaElTalpTheme
+import com.example.xafaeltalp.viewmodel.GameSound
 import com.example.xafaeltalp.viewmodel.GameViewmodel
+import kotlinx.coroutines.flow.collectLatest
 
 class MainActivity : ComponentActivity() {
 
     private var sensorManager: SensorManager? = null
     private var accelerometer: Sensor? = null
     private var ultimTempsSacsejada: Long = 0
+    private var mediaPlayer: MediaPlayer? = null
+
+    private var soundPool: SoundPool? = null
+    private var soundHitId: Int = 0
+    private var soundExplosionId: Int = 0
+    private var soundGoldenHitId: Int = 0
 
     private val sensorEventListener = object : SensorEventListener {
         override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
@@ -59,8 +71,52 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        // Inicialitzar música de fondo
+        Log.d("SOUND_DEBUG", "Inicializando MediaPlayer...")
+        mediaPlayer = MediaPlayer.create(this, R.raw.musica_joc)
+        if (mediaPlayer == null) {
+            Log.e("SOUND_DEBUG", "¡ERROR! No se pudo crear el MediaPlayer para musica_joc")
+        } else {
+            mediaPlayer?.isLooping = true
+            Log.d("SOUND_DEBUG", "MediaPlayer inicializado correctamente")
+        }
+
+        // Inicialitzar SoundPool para efectos cortos
+        val audioAttributes = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_GAME)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build()
+        soundPool = SoundPool.Builder()
+            .setMaxStreams(5)
+            .setAudioAttributes(audioAttributes)
+            .build()
+
+        soundHitId = soundPool?.load(this, R.raw.xafar_talp_sound, 1) ?: 0
+        soundExplosionId = soundPool?.load(this, R.raw.explosion, 1) ?: 0
+        soundGoldenHitId = soundPool?.load(this, R.raw.gold_talp_sound, 1) ?: 0
+
         setContent {
             val gameViewModel: GameViewmodel = viewModel()
+
+            LaunchedEffect(Unit) {
+                gameViewModel.soundEvents.collectLatest { sound ->
+                    Log.d("SOUND_DEBUG", "Evento de sonido recibido: $sound")
+                    when (sound) {
+                        GameSound.HIT -> {
+                            Log.d("SOUND_DEBUG", "Reproduciendo HIT")
+                            soundPool?.play(soundHitId, 1f, 1f, 1, 0, 1f)
+                        }
+                        GameSound.EXPLOSION -> {
+                            Log.d("SOUND_DEBUG", "Reproduciendo EXPLOSION")
+                            soundPool?.play(soundExplosionId, 1f, 1f, 2, 0, 1f)
+                        }
+                        GameSound.GOLDEN_HIT -> {
+                            Log.d("SOUND_DEBUG", "Reproduciendo GOLDEN_HIT")
+                            soundPool?.play(soundGoldenHitId, 1f, 1f, 1, 0, 1f)
+                        }
+                    }
+                }
+            }
 
             DisposableEffect(Lifecycle.Event.ON_PAUSE) {
                 val observer = LifecycleEventObserver { _, event ->
@@ -86,11 +142,22 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         activarSensor()
+        Log.d("SOUND_DEBUG", "Intentando reproducir música (start)")
+        mediaPlayer?.start()
     }
 
     override fun onPause() {
         super.onPause()
         desactivarSensor()
+        mediaPlayer?.pause()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        mediaPlayer?.release()
+        mediaPlayer = null
+        soundPool?.release()
+        soundPool = null
     }
 
     private fun activarSensor() {

@@ -3,11 +3,17 @@ package com.example.xafaeltalp.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 
 enum class MoleType {
     NORMAL, GOLDEN, LESS_TIME, SLOWED, BOMB
+}
+
+enum class GameSound {
+    HIT, EXPLOSION, GOLDEN_HIT
 }
 
 data class GameUiState(
@@ -31,6 +37,9 @@ data class GameUiState(
 class GameViewmodel : ViewModel() {
     private val _uiState = MutableStateFlow(GameUiState())
     val uiState = _uiState.asStateFlow()
+
+    private val _soundEvents = Channel<GameSound>(Channel.BUFFERED)
+    val soundEvents = _soundEvents.receiveAsFlow()
 
     private var gameJob: Job? = null
     private var bossJob: Job? = null
@@ -214,11 +223,26 @@ class GameViewmodel : ViewModel() {
         var damageToBoss = 0f
 
         when(type) {
-            MoleType.NORMAL -> damageToBoss = 10f
-            MoleType.GOLDEN -> damageToBoss = 50f
-            MoleType.BOMB -> { handleLifeLoss(); return }
-            MoleType.LESS_TIME -> _uiState.value = _uiState.value.copy(timeLeft = (_uiState.value.timeLeft - 3).coerceAtLeast(0))
-            MoleType.SLOWED -> { }
+            MoleType.NORMAL -> {
+                damageToBoss = 10f
+                _soundEvents.trySend(GameSound.HIT)
+            }
+            MoleType.GOLDEN -> {
+                damageToBoss = 50f
+                _soundEvents.trySend(GameSound.GOLDEN_HIT)
+            }
+            MoleType.BOMB -> {
+                _soundEvents.trySend(GameSound.EXPLOSION)
+                handleLifeLoss()
+                return
+            }
+            MoleType.LESS_TIME -> {
+                _uiState.value = _uiState.value.copy(timeLeft = (_uiState.value.timeLeft - 20).coerceAtLeast(0))
+                _soundEvents.trySend(GameSound.HIT)
+            }
+            MoleType.SLOWED -> {
+                _soundEvents.trySend(GameSound.HIT)
+            }
         }
 
         if (_uiState.value.gameMode == "boss") {
