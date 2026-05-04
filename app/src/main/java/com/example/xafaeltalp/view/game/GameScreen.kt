@@ -1,6 +1,7 @@
 package com.example.xafaeltalp.view.game
 
-import androidx.compose.animation.*
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -13,14 +14,19 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.example.xafaeltalp.R
+import com.example.xafaeltalp.viewmodel.GameEvent
 import com.example.xafaeltalp.viewmodel.GameViewmodel
 import com.example.xafaeltalp.viewmodel.MoleType
 
@@ -33,9 +39,23 @@ fun GameScreen(
 ) {
     val state by vm.uiState.collectAsState()
     val tierraOscura = Color(0xFF5D4037)
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Requisito: Auto-Pausa al salir de la App
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE) {
+                vm.onEvent(GameEvent.PauseGame)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     LaunchedEffect(key1 = mode, key2 = difficulty) {
-        vm.startGame(mode, difficulty)
+        vm.onEvent(GameEvent.StartGame(mode, difficulty))
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -96,8 +116,25 @@ fun GameScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    ScoreBadge(label = "PUNTOS", value = "${state.score}/${state.targetScore}", color = Color(0xFF4CAF50))
-                    ScoreBadge(label = "TIEMPO", value = "${state.timeLeft}s", color = if (state.timeLeft < 10) Color.Red else tierraOscura)
+                    // Requisito: animateFloatAsState cuando el score cambia (feedback)
+                    val scoreScale by animateFloatAsState(
+                        targetValue = if (state.score > 0) 1.1f else 1f,
+                        animationSpec = tween(durationMillis = 100),
+                        label = "ScoreScale"
+                    )
+                    
+                    Box(modifier = Modifier.scale(scoreScale)) {
+                        ScoreBadge(label = "PUNTOS", value = "${state.score}/${state.targetScore}", color = Color(0xFF4CAF50))
+                    }
+                    
+                    // Requisito: animateColorAsState para feedback del tiempo
+                    val timerColor by androidx.compose.animation.animateColorAsState(
+                        targetValue = if (state.timeLeft < 5) Color.Red else tierraOscura,
+                        animationSpec = tween(durationMillis = 500),
+                        label = "TimerColor"
+                    )
+                    
+                    ScoreBadge(label = "TIEMPO", value = "${state.timeLeft}s", color = timerColor)
                 }
             }
 
@@ -123,13 +160,15 @@ fun GameScreen(
 
             Box(
                 modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
                     .clip(RoundedCornerShape(20.dp))
                     .background(Color.Black.copy(alpha = 0.2f))
                     .padding(8.dp)
             ) {
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(3),
-                    modifier = Modifier.size(340.dp),
+                    modifier = Modifier.fillMaxSize(),
                     userScrollEnabled = false
                 ) {
                     items(9) { index ->
@@ -143,7 +182,7 @@ fun GameScreen(
                                 .clip(RoundedCornerShape(15.dp))
                                 .background(if (isBlocked) Color(0xFF3E2723) else Color.White.copy(alpha = 0.15f))
                                 .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(15.dp))
-                                .bounceClick { vm.onMoleHit(index) },
+                                .bounceClick { vm.onEvent(GameEvent.HitMole(index)) },
                             contentAlignment = Alignment.Center
                         ) {
                             if (isBlocked) {
@@ -180,13 +219,13 @@ fun GameScreen(
         }
 
         if (state.isPaused) {
-            PauseOverlay(onResume = { vm.resumeGame() }, onMenu = onBackClick)
+            PauseOverlay(onResume = { vm.onEvent(GameEvent.ResumeGame) }, onMenu = onBackClick)
         }
 
         if (state.isGameOver) {
             GameOverOverlay(score = state.score, onRetry = {
-                vm.resetGame()
-                vm.startGame(mode, difficulty)
+                vm.onEvent(GameEvent.ResetGame)
+                vm.onEvent(GameEvent.StartGame(mode, difficulty))
             }, onMenu = onBackClick)
         }
 
@@ -278,7 +317,16 @@ fun PauseOverlay(onResume: () -> Unit, onMenu: () -> Unit) {
 
 @Composable
 fun MoleIcon(type: MoleType) {
-    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+    // Requisito: Animación de estado (Escalado al aparecer)
+    var isVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { isVisible = true }
+    val scale by animateFloatAsState(
+        targetValue = if (isVisible) 1f else 0.2f,
+        animationSpec = tween(durationMillis = 300),
+        label = "MoleScale"
+    )
+
+    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize().scale(scale)) {
         val resId = when(type) {
             MoleType.NORMAL -> R.drawable.talp_button
             MoleType.GOLDEN -> R.drawable.goldentalp

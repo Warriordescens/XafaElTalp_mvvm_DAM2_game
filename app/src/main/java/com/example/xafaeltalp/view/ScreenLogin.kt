@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.example.xafaeltalp.viewmodel.LoginUiState
+import com.example.xafaeltalp.viewmodel.LoginEvent
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -29,10 +30,7 @@ import com.example.xafaeltalp.view.game.bounceClick
 @Composable
 fun ScreenLogin(
     state: LoginUiState,
-    onUsernameChange: (String) -> Unit,
-    onPasswordChange: (String) -> Unit,
-    onRegisterClick: () -> Unit,
-    onLoginClick: () -> Unit,
+    onEvent: (LoginEvent) -> Unit,
     onCloseClick: () -> Unit
 ){
     val tierraOscura = Color(0xFF5D4037)
@@ -74,7 +72,7 @@ fun ScreenLogin(
 
         OutlinedTextField(
             value = state.username,
-            onValueChange = onUsernameChange,
+            onValueChange = { onEvent(LoginEvent.UsernameChanged(it)) },
             label = { Text("Usuario") },
             modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
             shape = RoundedCornerShape(12.dp),
@@ -87,7 +85,7 @@ fun ScreenLogin(
 
         OutlinedTextField(
             value = state.password,
-            onValueChange = onPasswordChange,
+            onValueChange = { onEvent(LoginEvent.PasswordChanged(it)) },
             label = { Text("Contraseña") },
             visualTransformation = PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
@@ -100,8 +98,8 @@ fun ScreenLogin(
         )
 
         Button(
-            onClick = onLoginClick,
-            modifier = Modifier.fillMaxWidth().height(56.dp).bounceClick { onLoginClick() },
+            onClick = { onEvent(LoginEvent.LoginClicked) },
+            modifier = Modifier.fillMaxWidth().height(56.dp).bounceClick { onEvent(LoginEvent.LoginClicked) },
             shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.buttonColors(containerColor = tierraOscura)
         ) {
@@ -112,7 +110,7 @@ fun ScreenLogin(
 
         Row(modifier = Modifier.fillMaxWidth()) {
             OutlinedButton(
-                onClick = onRegisterClick,
+                onClick = { onEvent(LoginEvent.RegisterClicked) },
                 modifier = Modifier.weight(1f).height(50.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = tierraOscura)

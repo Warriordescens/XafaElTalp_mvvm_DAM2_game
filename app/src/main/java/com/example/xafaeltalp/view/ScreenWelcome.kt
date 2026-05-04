@@ -18,6 +18,7 @@ import com.example.xafaeltalp.view.game.bounceClick
 
 @Composable
 fun ScreenWelcome(
+    isConnected: Boolean?,
     onLogoutClick: () -> Unit,
     onStartGame: () -> Unit,
     onRankingClick: () -> Unit = {},
@@ -27,6 +28,28 @@ fun ScreenWelcome(
     val fondoColor = Color(0xFFF4E3B1)
 
     Box(modifier = Modifier.fillMaxSize().background(fondoColor)) {
+
+        // --- ESTADO API ---
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 45.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            val statusText = when (isConnected) {
+                true -> "conectado a la api"
+                false -> "no se ha conectado a la api"
+                null -> "conectando..."
+            }
+            val statusColor = if (isConnected == true) Color(0xFF4CAF50) else Color.Red
+            
+            Text(
+                text = statusText,
+                color = if (isConnected == null) Color.Gray else statusColor,
+                fontSize = 16.sp,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+            )
+        }
 
         // --- INFORMACIÓN ARRIBA A LA DERECHA ---
         Box(

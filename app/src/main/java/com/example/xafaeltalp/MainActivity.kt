@@ -20,6 +20,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.xafaeltalp.navigation.AppNavigation
 import com.example.xafaeltalp.ui.theme.XafaElTalpTheme
+import com.example.xafaeltalp.viewmodel.GameEvent
 import com.example.xafaeltalp.viewmodel.GameSound
 import com.example.xafaeltalp.viewmodel.GameViewmodel
 import kotlinx.coroutines.flow.collectLatest
@@ -35,6 +36,7 @@ class MainActivity : ComponentActivity() {
     private var soundHitId: Int = 0
     private var soundExplosionId: Int = 0
     private var soundGoldenHitId: Int = 0
+    private var gameViewModel: GameViewmodel? = null
 
     private val sensorEventListener = object : SensorEventListener {
         override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
@@ -51,16 +53,16 @@ class MainActivity : ComponentActivity() {
 
                 val gForce = Math.sqrt((gX * gX + gY * gY + gZ * gZ).toDouble()).toFloat()
 
-                // Log para que veas en el Logcat qué valores da tu emulador al moverlo
+                // Log para que ver en el Logcat qué valores da
                 if (gForce > 1.1f) Log.d("SENSOR_TEST", "Fuerza G: $gForce")
 
-                // Bajamos a 1.2f para que el emulador lo pille más fácil
+                // 1.2f para que el emulador lo pille más fácil
                 if (gForce > 1.2f) {
                     val tempsActual = System.currentTimeMillis()
                     if (tempsActual - ultimTempsSacsejada > 2000) {
                         ultimTempsSacsejada = tempsActual
-                        Log.d("SENSOR", "¡SACSEJADA! Cerrando app...")
-                        finalitzarAplicacio()
+                        Log.d("SENSOR", "¡SACSEJADA! Enviando evento al ViewModel")
+                        gameViewModel?.onEvent(GameEvent.ShakeDetected)
                     }
                 }
             }
@@ -71,12 +73,17 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Inicialitzar música de fondo
+        // Inicialitzar música de fons
         Log.d("SOUND_DEBUG", "Inicializando MediaPlayer...")
         mediaPlayer = MediaPlayer.create(this, R.raw.musica_joc)
         if (mediaPlayer == null) {
-            Log.e("SOUND_DEBUG", "¡ERROR! No se pudo crear el MediaPlayer para musica_joc")
+            Log.e("SOUND_DEBUG", "¡ERROR! No se pudo crear el MediaPlayer")
         } else {
+            val musicAttributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_GAME)
+                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                .build()
+            mediaPlayer?.setAudioAttributes(musicAttributes)
             mediaPlayer?.isLooping = true
             Log.d("SOUND_DEBUG", "MediaPlayer inicializado correctamente")
         }
@@ -96,10 +103,11 @@ class MainActivity : ComponentActivity() {
         soundGoldenHitId = soundPool?.load(this, R.raw.gold_talp_sound, 1) ?: 0
 
         setContent {
-            val gameViewModel: GameViewmodel = viewModel()
+            val vm: GameViewmodel = viewModel()
+            gameViewModel = vm
 
             LaunchedEffect(Unit) {
-                gameViewModel.soundEvents.collectLatest { sound ->
+                vm.soundEvents.collectLatest { sound ->
                     Log.d("SOUND_DEBUG", "Evento de sonido recibido: $sound")
                     when (sound) {
                         GameSound.HIT -> {
@@ -121,7 +129,7 @@ class MainActivity : ComponentActivity() {
             DisposableEffect(Lifecycle.Event.ON_PAUSE) {
                 val observer = LifecycleEventObserver { _, event ->
                     if (event == Lifecycle.Event.ON_PAUSE) {
-                        gameViewModel.pauseGame()
+                        vm.onEvent(GameEvent.PauseGame)
                     }
                 }
                 lifecycle.addObserver(observer)
@@ -133,7 +141,7 @@ class MainActivity : ComponentActivity() {
             XafaElTalpTheme {
                 AppNavigation(
                     onCloseApp = ::finalitzarAplicacio,
-                    gameViewModel = gameViewModel
+                    gameViewModel = vm
                 )
             }
         }
@@ -176,7 +184,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun finalitzarAplicacio() {
-        // finishAffinity cierra todo el árbol de actividades de golpe
+        // finishAffinity cierra el árbol de actividades de golpe
         this.finishAffinity()
     }
 }

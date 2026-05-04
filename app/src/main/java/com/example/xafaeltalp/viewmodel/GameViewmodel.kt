@@ -1,7 +1,10 @@
 package com.example.xafaeltalp.viewmodel
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.xafaeltalp.model.AppDatabase
+import com.example.xafaeltalp.model.GameRecord
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,6 +17,15 @@ enum class MoleType {
 
 enum class GameSound {
     HIT, EXPLOSION, GOLDEN_HIT
+}
+
+sealed interface GameEvent {
+    data class StartGame(val mode: String, val difficulty: String) : GameEvent
+    data object PauseGame : GameEvent
+    data object ResumeGame : GameEvent
+    data class HitMole(val index: Int) : GameEvent
+    data object ResetGame : GameEvent
+    data object ShakeDetected : GameEvent
 }
 
 data class GameUiState(
@@ -34,9 +46,11 @@ data class GameUiState(
     val lives: Int = 3
 )
 
-class GameViewmodel : ViewModel() {
+class GameViewmodel(application: Application) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow(GameUiState())
     val uiState = _uiState.asStateFlow()
+
+    private val gameDao = AppDatabase.getDatabase(application).gameDao()
 
     private val _soundEvents = Channel<GameSound>(Channel.BUFFERED)
     val soundEvents = _soundEvents.receiveAsFlow()
@@ -47,7 +61,24 @@ class GameViewmodel : ViewModel() {
     
     private var maxBossHealth = 200f
 
-    fun startGame(mode: String, difficulty: String) {
+    fun onEvent(event: GameEvent) {
+        when (event) {
+            is GameEvent.StartGame -> startGame(event.mode, event.difficulty)
+            is GameEvent.PauseGame -> pauseGame()
+            is GameEvent.ResumeGame -> resumeGame()
+            is GameEvent.HitMole -> onMoleHit(event.index)
+            is GameEvent.ResetGame -> resetGame()
+            is GameEvent.ShakeDetected -> {
+                if (!_uiState.value.isGameOver && !_uiState.value.isPaused) {
+                    // Acción del Shake: Por ejemplo, limpiar topos actuales (ayuda al usuario)
+                    _uiState.value = _uiState.value.copy(activeMoles = emptyMap())
+                    _soundEvents.trySend(GameSound.EXPLOSION)
+                }
+            }
+        }
+    }
+
+    private fun startGame(mode: String, difficulty: String) {
         val isFirstStart = _uiState.value.level == 1 && _uiState.value.score == 0
         
         if (isFirstStart || mode == "boss") {
@@ -117,6 +148,7 @@ class GameViewmodel : ViewModel() {
         if (_uiState.value.timeLeft <= 0 && !_uiState.value.isLevelCleared && !_uiState.value.isPaused) {
             if (_uiState.value.gameMode == "endless") {
                 _uiState.value = _uiState.value.copy(isGameOver = true)
+                saveGameResult()
             } else {
                 _uiState.value = _uiState.value.copy(bossActionMessage = "¡ATAQUE DEL BOSS!")
                 handleLifeLoss()
@@ -128,6 +160,7 @@ class GameViewmodel : ViewModel() {
         val newLives = _uiState.value.lives - 1
         if (newLives <= 0) {
             _uiState.value = _uiState.value.copy(lives = 0, isGameOver = true, activeMoles = emptyMap())
+            saveGameResult()
         } else {
             _uiState.value = _uiState.value.copy(
                 lives = newLives,
@@ -135,6 +168,18 @@ class GameViewmodel : ViewModel() {
                 activeMoles = emptyMap()
             )
             resumeJobs()
+        }
+    }
+
+    private fun saveGameResult() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val record = GameRecord(
+                playerName = "Jugador 1", // En un caso real vendría de la sesión
+                score = _uiState.value.score,
+                mode = _uiState.value.gameMode,
+                difficulty = _uiState.value.difficulty
+            )
+            gameDao.insertRecord(record)
         }
     }
 

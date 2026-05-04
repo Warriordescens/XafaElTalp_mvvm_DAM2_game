@@ -21,6 +21,13 @@ data class LoginUiState(
     val isLoading: Boolean = false
 )
 
+sealed interface LoginEvent {
+    data class UsernameChanged(val input: String) : LoginEvent
+    data class PasswordChanged(val input: String) : LoginEvent
+    data object LoginClicked : LoginEvent
+    data object RegisterClicked : LoginEvent
+}
+
 class LoginViewModel(application: Application) : AndroidViewModel(application) {
     
     private val repository: UserRepository
@@ -36,7 +43,16 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
     private val _navigationChannel = Channel<String>()
     val navigationChannel = _navigationChannel.receiveAsFlow()
 
-    fun onUsernameChange(input: String) {
+    fun onEvent(event: LoginEvent) {
+        when (event) {
+            is LoginEvent.UsernameChanged -> onUsernameChange(event.input)
+            is LoginEvent.PasswordChanged -> onPasswordChange(event.input)
+            is LoginEvent.LoginClicked -> onLoginClick()
+            is LoginEvent.RegisterClicked -> onRegisterClick()
+        }
+    }
+
+    private fun onUsernameChange(input: String) {
         _uiState.value = _uiState.value.copy(username = input, message = "", errorMsg = "")
     }
 

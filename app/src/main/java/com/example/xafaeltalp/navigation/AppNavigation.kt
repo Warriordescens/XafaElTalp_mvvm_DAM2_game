@@ -17,6 +17,7 @@ import com.example.xafaeltalp.view.ScreenWelcome
 import com.example.xafaeltalp.view.game.GameScreen
 import com.example.xafaeltalp.viewmodel.GameViewmodel
 import com.example.xafaeltalp.viewmodel.LoginViewModel
+import com.example.xafaeltalp.viewmodel.WelcomeViewModel
 import com.example.xafaeltalp.view.ScreenInfo
 import com.example.xafaeltalp.view.ModeSelectionScreen
 
@@ -56,16 +57,17 @@ fun AppNavigation(
 
             ScreenLogin(
                 state = state,
-                onUsernameChange = viewModel::onUsernameChange,
-                onPasswordChange = viewModel::onPasswordChange,
-                onRegisterClick = viewModel::onRegisterClick,
-                onLoginClick = viewModel::onLoginClick,
+                onEvent = viewModel::onEvent,
                 onCloseClick = onCloseApp
             )
         }
 
         composable(route = AppScreens.Welcome.route) {
+            val welcomeVm: WelcomeViewModel = viewModel()
+            val isConnected by welcomeVm.isConnected.collectAsState()
+            
             ScreenWelcome(
+                isConnected = isConnected,
                 onLogoutClick = ::ferLogout,
                 onStartGame = ::anarASeleccioMode,
                 onInfoClick = { navController.navigate(AppScreens.Info.route) }
