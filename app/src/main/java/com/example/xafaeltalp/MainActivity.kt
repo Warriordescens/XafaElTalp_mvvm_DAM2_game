@@ -61,8 +61,8 @@ class MainActivity : ComponentActivity() {
                     val tempsActual = System.currentTimeMillis()
                     if (tempsActual - ultimTempsSacsejada > 2000) {
                         ultimTempsSacsejada = tempsActual
-                        Log.d("SENSOR", "¡SACSEJADA! Enviando evento al ViewModel")
-                        gameViewModel?.onEvent(GameEvent.ShakeDetected)
+                        Log.d("SENSOR", "¡SACSEJADA! Cerrando app...")
+                        finalitzarAplicacio()
                     }
                 }
             }
